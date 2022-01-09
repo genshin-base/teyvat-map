@@ -16,10 +16,11 @@ const { createCanvas } = canvas
 
 const BASE_LEVEL = 1 //0 or 1
 const MIN_LEVEL = -5
+const IN_TILE_SIZE = 1024 //on level 0
 const OUT_TILE_SIZE = 256
 const ORIGIN = { tile: { i: -1, j: 2 }, offset: { x: 1498.5 / 2048, y: 1498.5 / 2048 } }
 
-const OPTIMIZE = 5 //or false
+const OPTIMIZE = 5 //0-7 or false
 
 /** Extra output map crop, in tiles (output-sized) */
 const CROP = {
@@ -31,7 +32,6 @@ const CROP = {
 
 /* === /CONFIG === */
 
-const IN_TILE_SIZE = 1024 * 2 ** BASE_LEVEL
 ORIGIN.offset.x = Math.round(ORIGIN.offset.x * IN_TILE_SIZE) / IN_TILE_SIZE
 ORIGIN.offset.y = Math.round(ORIGIN.offset.y * IN_TILE_SIZE) / IN_TILE_SIZE
 
@@ -64,55 +64,73 @@ async function loadImageCached(fpath) {
 	const { rect: inRect } = await getSavedRawTiles(OUT_RAW_TILES_DIR)
 	// const inRect = { left: -4, right: -4, top: -7, bottom: -7 }
 
-	const outRect = {
-		left: Math.floor(xIn2out(inRect.left)) + CROP.left * 2 ** BASE_LEVEL,
-		right: Math.ceil(xIn2out(inRect.right - 1)) - CROP.right * 2 ** BASE_LEVEL,
-		top: Math.floor(yIn2out(inRect.top)) + CROP.top * 2 ** BASE_LEVEL,
-		bottom: Math.ceil(yIn2out(inRect.bottom - 1)) - CROP.bottom * 2 ** BASE_LEVEL,
-	}
-
-	const fullInWidth = (inRect.left - inRect.right + 1) * IN_TILE_SIZE
-	const fullInHeight = (inRect.top - inRect.bottom + 1) * IN_TILE_SIZE
-
-	const mask = await prepareMask(OUT_MAP_MASK_CFG, IN_TILE_SIZE, fullInWidth, fullInHeight)
-
 	const outCanvas = createCanvas(OUT_TILE_SIZE, OUT_TILE_SIZE)
 	const outRC = outCanvas.getContext('2d')
 	outRC.quality = 'best'
 
 	const outCanvasRGB = createCanvas(OUT_TILE_SIZE, OUT_TILE_SIZE)
 
-	const tasks = new PromisePool()
-
 	const optimizationStats = { orig: 0, opt: 0 }
 
 	await recreateDir(makeOutTilesDirPath(OUT_TILES_DIR, 'png'))
 
-	for (let outJ = outRect.top; outJ <= outRect.bottom; outJ++) {
-		for (let outI = outRect.left; outI <= outRect.right; outI++) {
+	for (let level = BASE_LEVEL; level >= 0; level--)
+		await generateLayerFromInTiles(inRect, level, outCanvas, outCanvasRGB, optimizationStats)
+
+	for (let level = -1; level >= MIN_LEVEL; level--)
+		await generateLayerFromPrevious(inRect, level, outCanvas, outCanvasRGB, optimizationStats)
+
+	if (OPTIMIZE) {
+		const perc = (100 * optimizationStats.opt) / optimizationStats.orig
+		console.log(`png optimization rate: ${perc.toFixed(1)}%`)
+	}
+})().catch(console.error)
+
+/**
+ * @param {import('#lib/tiles/raw').TilesRect} inRect
+ * @param {number} level
+ * @param {canvas.Canvas} outCanvas
+ * @param {canvas.Canvas} outCanvasRGB
+ * @param {{ orig:number, opt:number }} optimizationStats
+ */
+async function generateLayerFromInTiles(inRect, level, outCanvas, outCanvasRGB, optimizationStats) {
+	const { top: outTop, bottom: outBottom, left: outLeft, right: outRight } = makeOutRect(inRect, level)
+	const inTileSize = IN_TILE_SIZE * 2 ** level
+
+	const outRC = outCanvas.getContext('2d')
+	outRC.quality = 'best'
+
+	const fullInWidth = (inRect.left - inRect.right + 1) * inTileSize
+	const fullInHeight = (inRect.top - inRect.bottom + 1) * inTileSize
+	const mask = await prepareMask(OUT_MAP_MASK_CFG, inTileSize, fullInWidth, fullInHeight)
+
+	const tasks = new PromisePool()
+
+	for (let outJ = outTop; outJ <= outBottom; outJ++) {
+		for (let outI = outLeft; outI <= outRight; outI++) {
 			outRC.clearRect(0, 0, outRC.canvas.width, outRC.canvas.height)
 			let drawnCount = 0
 
-			const inIFrom = xOut2in(outI)
-			const inJFrom = yOut2in(outJ)
-			for (let inI = Math.ceil(inIFrom); inI >= Math.ceil(xOut2in(outI + 1)); inI--) {
-				for (let inJ = Math.ceil(inJFrom); inJ >= Math.ceil(yOut2in(outJ + 1)); inJ--) {
-					const xOffset = (xIn2out(inI) - outI) * OUT_TILE_SIZE
-					const yOffset = (yIn2out(inJ) - outJ) * OUT_TILE_SIZE
+			const inIFrom = xOut2in(outI, level)
+			const inJFrom = yOut2in(outJ, level)
+			for (let inI = Math.ceil(inIFrom); inI >= Math.ceil(xOut2in(outI + 1, level)); inI--) {
+				for (let inJ = Math.ceil(inJFrom); inJ >= Math.ceil(yOut2in(outJ + 1, level)); inJ--) {
+					const xOffset = (xIn2out(inI, level) - outI) * OUT_TILE_SIZE
+					const yOffset = (yIn2out(inJ, level) - outJ) * OUT_TILE_SIZE
 					if (!isRound(xOffset) || !isRound(yOffset))
 						throw new Error(`offset (${xOffset},${yOffset}) is not round`)
 
 					const img = await loadImageCached(`${OUT_RAW_TILES_DIR}/${inJ}_${inI}.png`)
 					if (!img) continue
 
-					outRC.drawImage(img, xOffset, yOffset, IN_TILE_SIZE, IN_TILE_SIZE)
+					outRC.drawImage(img, xOffset, yOffset, inTileSize, inTileSize)
 					drawnCount++
 				}
 			}
 
 			if (mask) {
-				const x = (inRect.left - inIFrom) * IN_TILE_SIZE
-				const y = (inRect.top - inJFrom) * IN_TILE_SIZE
+				const x = (inRect.left - inIFrom) * inTileSize
+				const y = (inRect.top - inJFrom) * inTileSize
 				applyMaskCrop(outRC, mask.imgs, -x, -y)
 				applyMaskShadow(outRC, 0, 0, mask, -x, -y, OUT_TILE_SIZE, OUT_TILE_SIZE)
 				applyMaskStroke(outRC, mask.imgs, -x, -y)
@@ -130,120 +148,133 @@ async function loadImageCached(fpath) {
 				}
 
 				if (!isBlank) {
-					const outFPath = makeOutTilePath(OUT_TILES_DIR, BASE_LEVEL, outI, outJ, 'png')
+					const outFPath = makeOutTilePath(OUT_TILES_DIR, level, outI, outJ, 'png')
 					await fs.mkdir(dirname(outFPath), { recursive: true })
-					if (isOpaque) {
-						outCanvasRGB.getContext('2d', { alpha: false }).drawImage(outCanvas, 0, 0)
-						await saveCanvas(outFPath, outCanvasRGB)
-					} else {
-						await saveCanvas(outFPath, outCanvas)
-					}
+					await saveMaybeOpaque(outFPath, outCanvas, outCanvasRGB, isOpaque)
 					if (OPTIMIZE) await tasks.add(optimizeInPlace(outFPath, OPTIMIZE, optimizationStats))
 				}
 			}
 
 			{
-				const w = outRect.right - outRect.left + 1
-				const h = outRect.bottom - outRect.top + 1
-				const n = 1 + outI - outRect.left + w * (outJ - outRect.top)
+				const w = outRight - outLeft + 1
+				const h = outBottom - outTop + 1
+				const n = 1 + outI - outLeft + w * (outJ - outTop)
 				const total = w * h
-				process.stdout.write(
-					`level ${BASE_LEVEL}: ${n}/${total} ${((100 * n) / total).toFixed(0)}%\r`,
-				)
+				process.stdout.write(`level ${level}: ${n}/${total} ${((100 * n) / total).toFixed(0)}%\r`)
 			}
 		}
 	}
 	await tasks.end()
 	console.log()
+}
 
-	for (let level = BASE_LEVEL - 1, k = 2; level >= MIN_LEVEL; level--, k *= 2) {
-		const top = Math.floor(outRect.top / k)
-		const bottom = Math.ceil(outRect.bottom / k)
-		const left = Math.floor(outRect.left / k)
-		const right = Math.ceil(outRect.right / k)
+/**
+ * @param {import('#lib/tiles/raw').TilesRect} inRect
+ * @param {number} level
+ * @param {canvas.Canvas} outCanvas
+ * @param {canvas.Canvas} outCanvasRGB
+ * @param {{ orig:number, opt:number }} optimizationStats
+ */
+async function generateLayerFromPrevious(inRect, level, outCanvas, outCanvasRGB, optimizationStats) {
+	const { top, bottom, left, right } = makeOutRect(inRect, level)
 
-		for (let outJ = top; outJ <= bottom; outJ++) {
-			for (let outI = left; outI <= right; outI++) {
-				outRC.clearRect(0, 0, outRC.canvas.width, outRC.canvas.height)
-				let drawCount = 0
+	const outRC = outCanvas.getContext('2d')
+	outRC.quality = 'best'
 
-				for (let i = 0; i < 2; i++) {
-					for (let j = 0; j < 2; j++) {
-						const fpath = makeOutTilePath(OUT_TILES_DIR, level+1, outI*2 + i, outJ*2 + j, 'png') //prettier-ignore
-						const img = await loadImageIfExists(fpath)
-						if (!img) continue
-						const w = OUT_TILE_SIZE / 2
-						outRC.drawImage(img, i * w, j * w, w, w)
-						drawCount++
+	const tasks = new PromisePool()
+
+	for (let outJ = top; outJ <= bottom; outJ++) {
+		for (let outI = left; outI <= right; outI++) {
+			outRC.clearRect(0, 0, outRC.canvas.width, outRC.canvas.height)
+			let drawCount = 0
+
+			for (let i = 0; i < 2; i++) {
+				for (let j = 0; j < 2; j++) {
+					const fpath = makeOutTilePath(OUT_TILES_DIR, level+1, outI*2 + i, outJ*2 + j, 'png') //prettier-ignore
+					const img = await loadImageIfExists(fpath)
+					if (!img) continue
+					const w = OUT_TILE_SIZE / 2
+					outRC.drawImage(img, i * w, j * w, w, w)
+					drawCount++
+				}
+			}
+
+			if (drawCount > 0) {
+				const { data } = outRC.getImageData(0, 0, OUT_TILE_SIZE, OUT_TILE_SIZE)
+				let isOpaque = true
+				for (let i = 0; i < data.length; i += 4) {
+					const a = data[i + 3]
+					if (a !== 255) {
+						isOpaque = false
+						break
 					}
 				}
 
-				if (drawCount > 0) {
-					const outFPath = makeOutTilePath(OUT_TILES_DIR, level, outI, outJ, 'png')
-					await fs.mkdir(dirname(outFPath), { recursive: true })
-					await saveCanvas(outFPath, outCanvas)
-					if (OPTIMIZE) await tasks.add(optimizeInPlace(outFPath, OPTIMIZE, optimizationStats))
-				}
+				const outFPath = makeOutTilePath(OUT_TILES_DIR, level, outI, outJ, 'png')
+				await fs.mkdir(dirname(outFPath), { recursive: true })
+				await saveMaybeOpaque(outFPath, outCanvas, outCanvasRGB, isOpaque)
+				if (OPTIMIZE) await tasks.add(optimizeInPlace(outFPath, OPTIMIZE, optimizationStats))
+			}
 
-				{
-					const w = right - left + 1
-					const h = bottom - top + 1
-					const n = 1 + outI - left + w * (outJ - top)
-					const total = w * h
-					process.stdout.write(`level ${level}: ${n}/${total} ${((100 * n) / total).toFixed(0)}%\r`)
-				}
+			{
+				const w = right - left + 1
+				const h = bottom - top + 1
+				const n = 1 + outI - left + w * (outJ - top)
+				const total = w * h
+				process.stdout.write(`level ${level}: ${n}/${total} ${((100 * n) / total).toFixed(0)}%\r`)
 			}
 		}
-		await tasks.end()
-		console.log()
 	}
+	await tasks.end()
+	console.log()
+}
 
-	if (OPTIMIZE) {
-		const perc = (100 * optimizationStats.opt) / optimizationStats.orig
-		console.log(`png optimization rate: ${perc.toFixed(1)}%`)
+/**
+ * @param {string} fpath
+ * @param {canvas.Canvas} canvas
+ * @param {canvas.Canvas} canvasRGB
+ * @param {boolean} isOpaque
+ */
+async function saveMaybeOpaque(fpath, canvas, canvasRGB, isOpaque) {
+	if (isOpaque) {
+		canvasRGB.getContext('2d', { alpha: false }).drawImage(canvas, 0, 0)
+		await saveCanvas(fpath, canvasRGB)
+	} else {
+		await saveCanvas(fpath, canvas)
 	}
-})().catch(console.error)
+}
 
-function xIn2out(x) {
-	return -((x - ORIGIN.tile.i + ORIGIN.offset.x) * IN_TILE_SIZE) / OUT_TILE_SIZE
+/**
+ * @param {import('#lib/tiles/raw').TilesRect} inRect
+ * @param {number} level
+ * @returns {import('#lib/tiles/raw').TilesRect}
+ */
+function makeOutRect(inRect, level) {
+	return {
+		left: Math.floor(xIn2out(inRect.left, level) + CROP.left * 2 ** level),
+		right: Math.ceil(xIn2out(inRect.right - 1, level) - CROP.right * 2 ** level),
+		top: Math.floor(yIn2out(inRect.top, level) + CROP.top * 2 ** level),
+		bottom: Math.ceil(yIn2out(inRect.bottom - 1, level) - CROP.bottom * 2 ** level),
+	}
 }
-function yIn2out(y) {
-	return -((y - ORIGIN.tile.j + ORIGIN.offset.y) * IN_TILE_SIZE) / OUT_TILE_SIZE
+
+/** @param {number} x @param {number} level */
+function xIn2out(x, level) {
+	return -((x - ORIGIN.tile.i + ORIGIN.offset.x) * IN_TILE_SIZE * 2 ** level) / OUT_TILE_SIZE
 }
-function xOut2in(x) {
-	return (-x * OUT_TILE_SIZE) / IN_TILE_SIZE - ORIGIN.offset.x + ORIGIN.tile.i
+/** @param {number} y @param {number} level */
+function yIn2out(y, level) {
+	return -((y - ORIGIN.tile.j + ORIGIN.offset.y) * IN_TILE_SIZE * 2 ** level) / OUT_TILE_SIZE
 }
-function yOut2in(y) {
-	return (-y * OUT_TILE_SIZE) / IN_TILE_SIZE - ORIGIN.offset.y + ORIGIN.tile.j
+/** @param {number} x @param {number} level */
+function xOut2in(x, level) {
+	return (-x * OUT_TILE_SIZE) / (IN_TILE_SIZE * 2 ** level) - ORIGIN.offset.x + ORIGIN.tile.i
+}
+/** @param {number} y @param {number} level */
+function yOut2in(y, level) {
+	return (-y * OUT_TILE_SIZE) / (IN_TILE_SIZE * 2 ** level) - ORIGIN.offset.y + ORIGIN.tile.j
 }
 
 function isRound(x) {
 	return Math.abs(x % 1) < 0.0001
 }
-
-// /** @typedef {{fpath:string, img:Promise<canvas.Image>|canvas.Image|null|Error}} ImgCacheItem */
-// const imgCache = /**@type {ImgCacheItem[]}*/ ([])
-// /** @param {string} fpath */
-// async function loadImageCached(fpath) {
-// 	const cacheIndex = imgCache.findIndex(x => x.fpath === fpath)
-// 	if (cacheIndex === -1) {
-// 		const promise = loadImageIfExists(fpath)
-// 		const item = /**@type {ImgCacheItem}*/ ({ fpath, img: promise })
-// 		imgCache.push(item)
-// 		if (imgCache.length > 16) imgCache.shift()
-
-// 		try {
-// 			item.img = await promise
-// 			return item.img
-// 		} catch (err) {
-// 			item.img = err
-// 			throw err
-// 		}
-// 	}
-
-// 	const item = imgCache[cacheIndex]
-
-// 	if (item.img instanceof Error) throw item.img
-// 	if (item.img && 'then' in item.img) return await item.img
-// 	return item.img
-// }

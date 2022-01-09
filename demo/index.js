@@ -56,7 +56,7 @@ const ProjectionFlat = {
 
 checkAvifSupport().then(avifIsSupported => {
 	if (avifIsSupported) {
-		if (location.hash === '#jpg') {
+		if (location.hash.includes('jpg')) {
 			alert(`avif is supported, but forcing ${tileExt}`)
 		} else {
 			tileExt = 'avif'

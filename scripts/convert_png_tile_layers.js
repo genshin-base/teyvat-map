@@ -11,7 +11,7 @@ import {
 	makeOutTilesDirPath,
 	parseOutTileFPath,
 } from '#lib/tiles/dirs.js'
-import { OUT_TILES_DIR } from './_common'
+import { OUT_TILES_DIR } from './_common.js'
 
 /* === CONFIG === */
 
@@ -19,7 +19,7 @@ const FORMATS = ['jpg', 'avif']
 
 const BG_COLOR = { r: 0, g: 0, b: 0 }
 
-const CJPEG_ARGS = ['-quality', '85', '-optimize', '-sample', '2x2']
+const CJPEG_ARGS = ['-quality', '78', '-optimize', '-sample', '2x2', '-tune-ssim']
 
 // speed tiles time size
 //  0     26  108.9 323341
@@ -28,14 +28,15 @@ const CJPEG_ARGS = ['-quality', '85', '-optimize', '-sample', '2x2']
 //  3     26   26.4 328009
 //  4     26   16.6 334516
 const AVIFENC_ARGS = [
-	['--speed', '1'], //0-10
-	['-a', 'cq-level=19'], //quality 0-63
+	['--speed', '0'], //0-10
+	['-a', 'cq-level=12'], //quality 0-63
 	['-a', 'end-usage=q'],
 	['-a', 'tune=ssim'],
-	['--min', '0'],
-	['--max', '63'],
+	['--min', '0'], //upper quality limit 0-63
+	['--max', '8'], //lower quality limit 0-63
 	['--cicp', '1/13/6'], //'1/13/0' for RGB mode
 ].flat()
+const AVIF_CHROMA_SUBSAMPLING = true
 
 /* === /CONFIG === */
 
@@ -54,6 +55,13 @@ const AVIFENC_ARGS = [
 			console.warn(`WARN: better use MozJPEG, current cjpeg binary is: ${version || '<no-version>'}`)
 			console.warn(`WARN: maybe with:`)
 			console.warn(`WARN:   env PATH="/path/to/mozjpeg/bin:$PATH" ./${relativeToCwd(process.argv[1])}`)
+			for (let i = 0; i < CJPEG_ARGS.length; i++) {
+				const arg = CJPEG_ARGS[i]
+				if (arg.startsWith('-tune-')) {
+					console.warn(`WARN: disabling cjpeg flag ${arg}`)
+					CJPEG_ARGS.splice(i--, 1)
+				}
+			}
 		}
 	}
 
@@ -104,7 +112,7 @@ const AVIFENC_ARGS = [
 							stdio: ['pipe', 'ignore', 'inherit'],
 						})
 						const stdin = mustBeNotNull(avifenc.process.stdin)
-						await writeY4m444(stdin, img.width, img.height, img.data)
+						await writeY4m444(stdin, img.width, img.height, img.data, AVIF_CHROMA_SUBSAMPLING)
 						stdin.end()
 						await avifenc.promise
 					}
@@ -128,13 +136,18 @@ const AVIFENC_ARGS = [
  * @param {number} width
  * @param {number} height
  * @param {Buffer} rgba
+ * @param {boolean} chromaSubsampling
  * @returns {Promise<void>}
  */
-function writeY4m444(ws, width, height, rgba) {
-	ws.write(`YUV4MPEG2 W${width} H${height} F25:1 Ip A1:1 C444 XCOLORRANGE=FULL\nFRAME\n`)
+function writeY4m444(ws, width, height, rgba, chromaSubsampling) {
+	if (chromaSubsampling && (width % 2 === 1 || height % 2 === 1))
+		throw new Error(`can not subsample odd size (${width}x${height})`)
+
+	const fixFmt = chromaSubsampling ? '420' : '444'
+	ws.write(`YUV4MPEG2 W${width} H${height} F25:1 Ip A1:1 C${fixFmt} XCOLORRANGE=FULL\nFRAME\n`)
 
 	const size = width * height
-	const pix = Buffer.alloc(size * 3)
+	let pix = Buffer.alloc(size * 3)
 	for (let j = 0; j < height; j++) {
 		for (let i = 0; i < width; i++) {
 			const src = (i + width * j) * 4
@@ -172,6 +185,25 @@ function writeY4m444(ws, width, height, rgba) {
 			pix[dest + size * 1] = roundClamp255(128 + ((b - Y) / (2 * (1 - kb))) * 255)
 			pix[dest + size * 2] = roundClamp255(128 + ((r - Y) / (2 * (1 - kr))) * 255)
 		}
+	}
+
+	if (chromaSubsampling) {
+		const w2 = width / 2
+		const h2 = height / 2
+		for (const [srcOffset, destOffset] of [
+			[width * height, width * height],
+			[width * height * 2, width * height + w2 * h2],
+		])
+			for (let j = 0; j < h2; j++) {
+				for (let i = 0; i < w2; i++) {
+					let sum = 0
+					for (let si = 0; si < 2; si++)
+						for (let sj = 0; sj < 2; sj++)
+							sum += pix[srcOffset + (i * 2 + si) + width * (j * 2 + sj)]
+					pix[destOffset + i + w2 * j] = sum / 4
+				}
+			}
+		pix = pix.subarray(0, width * height + 2 * w2 * h2)
 	}
 
 	return new Promise((res, rej) => {
