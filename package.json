@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "canvas": "^2.8.0",
-    "locmap": "file:../../git/locmap",
+    "locmap": "github:3bl3gamer/locmap#v1.7.0",
     "pngjs": "^6.0.0",
     "rollup": "^2.62.0",
     "rollup-plugin-node-resolve": "^5.2.0",
