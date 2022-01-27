@@ -2,20 +2,27 @@
 import { promises as fs } from 'fs'
 import { relative } from 'path'
 import { resize } from '#lib/media.js'
-import { exists } from '#lib/os.js'
-import { BASE_DIR } from './_common.js'
+import { exists, parseArgs } from '#lib/os.js'
+import { BASE_DIR, getChosenMapCode } from './_common.js'
 import { IN_TILES_CONFIG } from '../global_config.js'
 import { forEachTileGroup, getChosenTilesMap, rawTileKey } from '#lib/tiles/raw.js'
 
+/* === CONFIG === */
+
 const TILE_PREVIEW_SIZE = 256
 
-const TMP_TILE_DIR = `${BASE_DIR}/tmp/preview_tiles`
+/* === /CONFIG === */
+
+const args = parseArgs()
+const mapCode = getChosenMapCode(args)
+
+const TMP_TILE_DIR = `${BASE_DIR}/tmp/preview_tiles/${mapCode}`
 const PAGE_DIR = TMP_TILE_DIR
 
 ;(async () => {
 	await fs.mkdir(TMP_TILE_DIR, { recursive: true })
 
-	const tilesConfig = IN_TILES_CONFIG
+	const tilesConfig = IN_TILES_CONFIG[mapCode]
 	if (tilesConfig.dirs.length === 0) {
 		console.error('need some paths in "IN_TILES_CONFIG.dirs" in global_config.js')
 		process.exit(1)
@@ -23,8 +30,9 @@ const PAGE_DIR = TMP_TILE_DIR
 
 	const chosenTiles = getChosenTilesMap(tilesConfig)
 
+	console.log('searching files')
 	const tileRows = []
-	const tilesRect = await forEachTileGroup(tilesConfig, async (i, j, isRowStart, srcFPaths) => {
+	const tilesRect = await forEachTileGroup(tilesConfig, mapCode, async (i, j, isRowStart, srcFPaths) => {
 		if (isRowStart) tileRows.push([])
 
 		const fpaths = []
@@ -40,6 +48,11 @@ const PAGE_DIR = TMP_TILE_DIR
 		const tileRow = tileRows[tileRows.length - 1]
 		tileRow.push({ i, j, key: rawTileKey(i, j), fpaths })
 	})
+	const foundCount = tileRows.map(x => x.map(x => x.fpaths)).flat(2).length
+	if (foundCount === 0) {
+		console.error(`could not find any map tiles in: \n` + tilesConfig.dirs.map(x => '  ' + x).join('\n'))
+		process.exit(1)
+	}
 
 	console.log('generating page')
 	const pagePath = `${PAGE_DIR}/index.html`
@@ -47,6 +60,7 @@ const PAGE_DIR = TMP_TILE_DIR
 	await fs.writeFile(
 		pagePath,
 		`
+<meta charset="utf-8" />
 <body>
 <style>
 table { border-collapse: collapse }
@@ -107,6 +121,7 @@ function delRow(index) {
 function updateMultiChunk(cell, delta) {
 	const imgs = Array.from(cell.querySelectorAll('img'))
 	let index = imgs.findIndex(x => !x.classList.contains('hidden'))
+	if (index === -1) index = 0
 	for (const img of imgs) img.classList.add('hidden')
 	index = (index + delta) % imgs.length
 	imgs[index].classList.remove('hidden')
@@ -116,16 +131,19 @@ function updateMultiChunk(cell, delta) {
 function updateConfig() {
 	const cells = Array.from(tilesTable.querySelectorAll('.chunk.multi'))
 
-	configBox.textContent = 'export const IN_TILES_CONFIG = ' +
-		JSON.stringify({
-			dirs: ${JSON.stringify(tilesConfig.dirs)},
-			rect,
-			choices: Array.from(tilesTable.tBodies[0].rows).map(row => Array.from(row.cells).map(cell => {
-				const imgs = Array.from(cell.querySelectorAll('img'))
-				const index = imgs.findIndex(x => !x.classList.contains('hidden'))
-				return index<0 || imgs.length<=1 ? '.' : index.toString(10)
-			}).join('')),
-		}, null, '  ')
+	configBox.textContent = 'export const IN_TILES_CONFIG = {\\n' +
+		(
+			'${mapCode}: '+
+			JSON.stringify({
+				dirs: ${JSON.stringify(tilesConfig.dirs)},
+				rect,
+				choices: Array.from(tilesTable.tBodies[0].rows).map(row => Array.from(row.cells).map(cell => {
+					const imgs = Array.from(cell.querySelectorAll('img'))
+					const index = imgs.findIndex(x => !x.classList.contains('hidden'))
+					return index<0 || imgs.length<=1 ? '.' : index.toString(10)
+				}).join('')),
+			}, null, '  ')
+		).split('\\n').map(x => '  '+x).join('\\n') + ',\\n...'
 }
 
 tilesTable.querySelectorAll('.chunk.multi').forEach(x => updateMultiChunk(x, 0))
