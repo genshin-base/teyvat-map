@@ -9,66 +9,86 @@ import {
 } from 'locmap'
 import { makeTileMaskChecker } from '#lib/tiles/summary'
 
-const TILE_WIDTH = 192
+const TILE_DRAW_WIDTH = 192
+const TILE_CONTENT_WIDTH = 256 //tile width in game pixels on layer 0
 
-let tileExt = 'jpg'
-let tilesMask = /**@type {ReturnType<typeof makeTileMaskChecker>|null}*/ (null)
+const mapConfig = /**@type {*} */ (window).mapConfig
 
-fetch('../tiles/summary.json')
-	.then(r => r.json())
-	.then(info => {
-		tilesMask = makeTileMaskChecker(info)
-	})
+let tilesExt = 'jpg'
+let tilesGroup = 'teyvat'
+let tilesMask = {
+	teyvat: /**@type {ReturnType<typeof makeTileMaskChecker>|null}*/ (null),
+	enkanomiya: /**@type {ReturnType<typeof makeTileMaskChecker>|null}*/ (null),
+}
+
+for (const code in tilesMask)
+	fetch(`../tiles/${code}/summary.json`)
+		.then(r => r.json())
+		.then(info => {
+			tilesMask[code] = makeTileMaskChecker(info)
+		})
 
 /** @type {import('locmap').TilePlaceholderDrawFunc} */
 function drawTilePlaceholder(map, x, y, z, drawX, drawY, tileW, scale) {
-	if (tilesMask && !tilesMask(x, y, z)) return null
+	const mask = tilesMask[tilesGroup]
+	if (mask && !mask(x, y, z)) return null
 	drawRectTilePlaceholder(map, x, y, z, drawX, drawY, tileW, scale)
 }
 
-const innerTileLoad = loadTileImage((x, y, z) => `../tiles/${tileExt}/${z}/${x}/${y}.${tileExt}`)
+const innerTileLoad = loadTileImage(
+	(x, y, z) => `../tiles/${tilesGroup}/${tilesExt}/${z}/${x}/${y}.${tilesExt}`,
+)
 /** @type {import('locmap').TileImgLoadFunc} */
 function loadTile(x, y, z, onUpdate) {
-	if (tilesMask && !tilesMask(x, y, z)) return null
+	const mask = tilesMask[tilesGroup]
+	if (mask && !mask(x, y, z)) return null
 	innerTileLoad(x, y, z, onUpdate)
 }
 
 /** @type {import('locmap').ProjectionConverter} */
 const ProjectionFlat = {
 	x2lon(x, zoom) {
-		return (x / zoom) * TILE_WIDTH
+		return (x / zoom) * TILE_CONTENT_WIDTH
 	},
 	y2lat(y, zoom) {
-		return (y / zoom) * TILE_WIDTH
+		return (y / zoom) * TILE_CONTENT_WIDTH
 	},
 
 	lon2x(lon, zoom) {
-		return (lon * zoom) / TILE_WIDTH
+		return (lon * zoom) / TILE_CONTENT_WIDTH
 	},
 	lat2y(lat, zoom) {
-		return (lat * zoom) / TILE_WIDTH
+		return (lat * zoom) / TILE_CONTENT_WIDTH
 	},
 
 	meters2pixCoef(lat, zoom) {
-		return zoom / TILE_WIDTH
+		return zoom / TILE_CONTENT_WIDTH
 	},
 }
 
 checkAvifSupport().then(avifIsSupported => {
 	if (avifIsSupported) {
 		if (location.hash.includes('jpg')) {
-			alert(`avif is supported, but forcing ${tileExt}`)
+			alert(`avif is supported, but forcing ${tilesExt}`)
 		} else {
-			tileExt = 'avif'
+			tilesExt = 'avif'
 		}
 	} else {
-		alert(`avif seems not supported :(\nusing ${tileExt}`)
+		alert(`avif seems not supported :(\nusing ${tilesExt}`)
+	}
+
+	tilesGroup = mapConfig['map-code'].value
+	mapConfig.onchange = () => {
+		tilesGroup = mapConfig['map-code'].value
+		tileContainer.clearCache()
+		map.requestRedraw()
 	}
 
 	const map = new LocMap(document.body, ProjectionFlat)
+	const tileContainer = new SmoothTileContainer(TILE_DRAW_WIDTH, loadTile, drawTilePlaceholder)
 	map.setZoomRange(8, 512)
 	map.updateLocation(0, 0, 64 * 1.2)
-	map.register(new TileLayer(new SmoothTileContainer(TILE_WIDTH, loadTile, drawTilePlaceholder)))
+	map.register(new TileLayer(tileContainer))
 	map.register(new ControlLayer())
 	map.register(new URLLayer(0, 2))
 	map.requestRedraw()

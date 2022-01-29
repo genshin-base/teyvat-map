@@ -3,7 +3,7 @@ import { createReadStream, promises as fs } from 'fs'
 import { PNG } from 'pngjs'
 import { runCmd } from '#lib/media.js'
 import { mustBeNotNull, PromisePool } from '#lib/utils.js'
-import { readAllStream, recreateDir, relativeToCwd } from '#lib/os.js'
+import { parseArgs, readAllStream, recreateDir, relativeToCwd } from '#lib/os.js'
 import { dirname } from 'path'
 import {
 	forEachOutTileFPath,
@@ -11,7 +11,7 @@ import {
 	makeOutTilesDirPath,
 	parseOutTileFPath,
 } from '#lib/tiles/dirs.js'
-import { OUT_TILES_DIR } from './_common.js'
+import { getChosenMapCode, OUT_TILES_DIR } from './_common.js'
 
 /* === CONFIG === */
 
@@ -42,8 +42,11 @@ const AVIF_CHROMA_SUBSAMPLING = true
 
 //
 ;(async () => {
+	const args = parseArgs()
+	const mapCode = getChosenMapCode(args)
+
 	const fpaths = []
-	await forEachOutTileFPath(OUT_TILES_DIR, 'png', fpath => fpaths.push(fpath))
+	await forEachOutTileFPath(OUT_TILES_DIR, mapCode, 'png', fpath => fpaths.push(fpath))
 
 	if (FORMATS.includes('jpg')) {
 		const cjpeg = runCmd('cjpeg', ['-version'], {
@@ -66,7 +69,7 @@ const AVIF_CHROMA_SUBSAMPLING = true
 	}
 
 	for (const ext of FORMATS) {
-		await recreateDir(makeOutTilesDirPath(OUT_TILES_DIR, ext))
+		await recreateDir(makeOutTilesDirPath(OUT_TILES_DIR, mapCode, ext))
 	}
 
 	const tasks = new PromisePool()
@@ -92,7 +95,7 @@ const AVIF_CHROMA_SUBSAMPLING = true
 		const { level, i, j } = parseOutTileFPath(fpath)
 
 		for (const ext of FORMATS) {
-			const outFPath = makeOutTilePath(OUT_TILES_DIR, level, i, j, ext)
+			const outFPath = makeOutTilePath(OUT_TILES_DIR, mapCode, level, i, j, ext)
 			await fs.mkdir(dirname(outFPath), { recursive: true })
 
 			await tasks.add(

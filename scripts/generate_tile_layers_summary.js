@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import { decodeLayerMask, encodeLayerMask } from '#lib/tiles/summary.js'
-import { relativeToCwd } from '#lib/os.js'
+import { parseArgs, relativeToCwd } from '#lib/os.js'
 import { promises as fs } from 'fs'
-import { OUT_TILES_DIR } from './_common.js'
+import { getChosenMapCode, OUT_TILES_DIR } from './_common.js'
 import { forEachOutTileFPath, parseOutTileFPath } from '#lib/tiles/dirs.js'
 
 //
 ;(async () => {
+	const args = parseArgs()
+	const mapCode = getChosenMapCode(args)
+
 	checkEncDec(new Uint8Array([0]), 1, 1)
 	checkEncDec(new Uint8Array([1]), 1, 1)
 
@@ -24,7 +27,7 @@ import { forEachOutTileFPath, parseOutTileFPath } from '#lib/tiles/dirs.js'
 	checkEncDec(new Uint8Array(1024).fill(1), 32, 32)
 
 	const levels = /**@type {Map<number,{i:number, j:number}[]>}*/ (new Map())
-	await forEachOutTileFPath(OUT_TILES_DIR, 'png', fpath => {
+	await forEachOutTileFPath(OUT_TILES_DIR, mapCode, 'png', fpath => {
 		const { level, i, j } = parseOutTileFPath(fpath)
 		let item = levels.get(level)
 		if (item) {
@@ -61,7 +64,7 @@ import { forEachOutTileFPath, parseOutTileFPath } from '#lib/tiles/dirs.js'
 			)
 		})
 
-	const fpath = `${OUT_TILES_DIR}/summary.json`
+	const fpath = `${OUT_TILES_DIR}/${mapCode}/summary.json`
 	await fs.writeFile(fpath, `[\n${contentLines.join('\n')}\n]`)
 	console.log(`saved to ${relativeToCwd(fpath)}`)
 })().catch(console.error)

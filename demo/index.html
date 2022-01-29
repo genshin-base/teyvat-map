@@ -1,7 +1,7 @@
 <html>
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>GI Map Demo</title>
 		<style>
 			body {
@@ -12,9 +12,21 @@
 				touch-action: none;
 				user-select: none;
 			}
+			#mapConfig {
+				position: absolute;
+				z-index: 1;
+				right: 0;
+				background-color: #fff9;
+				border-radius: 0 0 0 5px;
+				padding: 3px;
+			}
 		</style>
 	</head>
 	<body>
+		<form id="mapConfig">
+			<label><input type="radio" name="map-code" value="teyvat" checked /> Teyvat</label>
+			<label><input type="radio" name="map-code" value="enkanomiya" /> Enkanomiya</label>
+		</form>
 		<script type="module" src="bundle.js"></script>
 	</body>
 </html>
