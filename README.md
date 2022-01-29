@@ -2,7 +2,7 @@
 
 `rm -r ./tmp/preview_tiles`.
 
-`./scripts/preview_map_chunks.js --map teyvat`
+`./scripts/generate_map_chunks_preview.js --map teyvat`
 
 Open `./tmp/preview_tiles/teyvat/index.html`, select rect and tiles.
 

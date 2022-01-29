@@ -3,29 +3,25 @@ import { promises as fs } from 'fs'
 import canvas from 'canvas'
 import { getChosenMapCode, OUT_RAW_TILES_DIR, OUT_TILES_DIR } from './_common.js'
 import { dirname } from 'path'
-import { OUT_MAP_MASK_CFG } from '../global_config.js'
+import { MAP_ORIGINS, OUT_MAP_MASK_CFG } from '../global_config.js'
 import { PromisePool } from '#lib/utils.js'
 import { parseArgs, recreateDir } from '#lib/os.js'
 import { loadImageIfExists, optimizeInPlace, saveCanvas } from '#lib/media.js'
 import { prepareMask, applyMaskCrop, applyMaskShadow, applyMaskStroke } from '#lib/tiles/mask.js'
-import { getSavedRawTiles, makeSavedRawTileFPath } from '#lib/tiles/raw.js'
+import { getSavedRawTiles, xOrigin2orig, yOrigin2orig } from '#lib/tiles/raw.js'
 import { makeOutTilePath, makeOutTilesDirPath } from '#lib/tiles/dirs.js'
 const { createCanvas } = canvas
 
 /* === CONFIG === */
 
-const BASE_LEVEL = 0 //0 or 1
+const BASE_LEVEL = 1 //0 or 1
 const MIN_LEVEL = -5
 const IN_TILE_SIZE = 1024 //on level 0
 const OUT_TILE_SIZE = 256
-const ORIGINS = {
-	teyvat: { tile: { i: -1, j: 2 }, offset: { x: 1498.5 / 2048, y: 1498.5 / 2048 } },
-	enkanomiya: { tile: { i: 0, j: 0 }, offset: { x: 0, y: 0 } },
-}
 
 const OPTIMIZE = 5 //0-7 or false
 
-/** Extra output map crop, in tiles (output-sized) */
+/** Extra output map crop, in tiles (output-sized on level 0) */
 const MAP_CROPS = {
 	teyvat: {
 		left: 3,
@@ -35,10 +31,16 @@ const MAP_CROPS = {
 	},
 	enkanomiya: {
 		left: 0,
-		top: 0,
-		right: 0,
-		bottom: 0,
+		top: 1,
+		right: 2,
+		bottom: 3,
 	},
+}
+
+// (optional) pre-scaled tiles for level 1 (if not set, tiles will be auto-upscaled from level 0 with bicibic)
+const SCALED_LEVEL_1_RAW_TILES_DIR = {
+	teyvat: null,
+	enkanomiya: OUT_RAW_TILES_DIR + '_x2',
 }
 
 /* === /CONFIG === */
@@ -46,9 +48,11 @@ const MAP_CROPS = {
 const args = parseArgs()
 const mapCode = getChosenMapCode(args)
 
-const ORIGIN = ORIGINS[mapCode]
-ORIGIN.offset.x = Math.round(ORIGIN.offset.x * IN_TILE_SIZE) / IN_TILE_SIZE
-ORIGIN.offset.y = Math.round(ORIGIN.offset.y * IN_TILE_SIZE) / IN_TILE_SIZE
+const ORIGIN = MAP_ORIGINS[mapCode]
+ORIGIN.offset = {
+	x: Math.round(ORIGIN.offset.x * IN_TILE_SIZE) / IN_TILE_SIZE,
+	y: Math.round(ORIGIN.offset.y * IN_TILE_SIZE) / IN_TILE_SIZE,
+}
 
 const CROP = MAP_CROPS[mapCode]
 
@@ -78,7 +82,10 @@ async function loadImageCached(fpath) {
 
 //
 ;(async () => {
-	const { rect: inRect } = await getSavedRawTiles(OUT_RAW_TILES_DIR, mapCode)
+	const { tiles: inTilesL0, rect: inRect } = await getSavedRawTiles(OUT_RAW_TILES_DIR, mapCode)
+	const prescaledLevel1Dir = SCALED_LEVEL_1_RAW_TILES_DIR[mapCode]
+	const inTilesL1 =
+		(prescaledLevel1Dir && (await getSavedRawTiles(prescaledLevel1Dir, mapCode)).tiles) || inTilesL0
 	// const inRect = { left: -4, right: -4, top: -7, bottom: -7 }
 
 	const outCanvas = createCanvas(OUT_TILE_SIZE, OUT_TILE_SIZE)
@@ -91,8 +98,9 @@ async function loadImageCached(fpath) {
 
 	await recreateDir(makeOutTilesDirPath(OUT_TILES_DIR, mapCode, 'png'))
 
-	for (let level = BASE_LEVEL; level >= 0; level--)
-		await generateLayerFromInTiles(inRect, level, outCanvas, outCanvasRGB, optimizationStats)
+	if (BASE_LEVEL === 1)
+		await generateLayerFromInTiles(inRect, inTilesL1, 1, outCanvas, outCanvasRGB, optimizationStats)
+	await generateLayerFromInTiles(inRect, inTilesL0, 0, outCanvas, outCanvasRGB, optimizationStats)
 
 	for (let level = -1; level >= MIN_LEVEL; level--)
 		await generateLayerFromPrevious(inRect, level, outCanvas, outCanvasRGB, optimizationStats)
@@ -105,12 +113,13 @@ async function loadImageCached(fpath) {
 
 /**
  * @param {import('#lib/tiles/raw').TilesRect} inRect
+ * @param {import('#lib/tiles/raw').SavedRawTile[]} inTiles
  * @param {number} level
  * @param {canvas.Canvas} outCanvas
  * @param {canvas.Canvas} outCanvasRGB
  * @param {{ orig:number, opt:number }} optimizationStats
  */
-async function generateLayerFromInTiles(inRect, level, outCanvas, outCanvasRGB, optimizationStats) {
+async function generateLayerFromInTiles(inRect, inTiles, level, outCanvas, outCanvasRGB, optimizationStats) {
 	const { top: outTop, bottom: outBottom, left: outLeft, right: outRight } = makeOutRect(inRect, level)
 	const inTileSize = IN_TILE_SIZE * 2 ** level
 
@@ -130,19 +139,21 @@ async function generateLayerFromInTiles(inRect, level, outCanvas, outCanvasRGB, 
 
 			const inIFrom = xOut2in(outI, level)
 			const inJFrom = yOut2in(outJ, level)
-			for (let inI = Math.ceil(inIFrom); inI >= Math.ceil(xOut2in(outI + 1, level)); inI--) {
-				for (let inJ = Math.ceil(inJFrom); inJ >= Math.ceil(yOut2in(outJ + 1, level)); inJ--) {
-					const xOffset = (xIn2out(inI, level) - outI) * OUT_TILE_SIZE
-					const yOffset = (yIn2out(inJ, level) - outJ) * OUT_TILE_SIZE
-					if (!isRound(xOffset) || !isRound(yOffset))
-						throw new Error(`offset (${xOffset},${yOffset}) is not round`)
+			for (const inTile of inTiles) {
+				let x, y
+				if (inTile.type === 'grid') {
+					x = (xIn2out(inTile.i, level) - outI) * OUT_TILE_SIZE
+					y = (yIn2out(inTile.j, level) - outJ) * OUT_TILE_SIZE
+				} else {
+					x = (xIn2out(xOrigin2orig(inTile.x, ORIGIN), level) - outI) * OUT_TILE_SIZE
+					y = (yIn2out(yOrigin2orig(inTile.y, ORIGIN), level) - outJ) * OUT_TILE_SIZE
+				}
+				if (!isRound(x) || !isRound(y)) throw new Error(`offset (${x},${y}) is not round`)
 
-					const img = await loadImageCached(
-						makeSavedRawTileFPath(OUT_RAW_TILES_DIR, mapCode, inI, inJ),
-					)
-					if (!img) continue
-
-					outRC.drawImage(img, xOffset, yOffset, inTileSize, inTileSize)
+				const isVisible = x + inTileSize > 0 && y + inTileSize > 0 && x < inTileSize && y < inTileSize
+				if (isVisible) {
+					const img = await loadImageCached(inTile.fpath)
+					outRC.drawImage(img, x, y, inTileSize, inTileSize)
 					drawnCount++
 				}
 			}

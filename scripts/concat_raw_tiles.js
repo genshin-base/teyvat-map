@@ -2,9 +2,9 @@
 import { parseArgs, relativeToCwd } from '#lib/os.js'
 import canvas from 'canvas'
 import { OUT_RAW_TILES_DIR, BASE_DIR, getChosenMapCode } from './_common.js'
-import { OUT_MAP_MASK_CFG } from '../global_config.js'
+import { MAP_ORIGINS, OUT_MAP_MASK_CFG } from '../global_config.js'
 import { prepareMask, applyMaskCrop, applyMaskShadow, applyMaskStroke } from '#lib/tiles/mask.js'
-import { getSavedRawTiles, makeSavedRawTileFPath } from '#lib/tiles/raw.js'
+import { getSavedRawTiles, xOrigin2orig, yOrigin2orig } from '#lib/tiles/raw.js'
 import { saveCanvas } from '#lib/media.js'
 const { createCanvas, loadImage } = canvas
 
@@ -34,7 +34,9 @@ const CROP = {
 	const args = parseArgs()
 	const mapCode = getChosenMapCode(args)
 
-	const { rect } = await getSavedRawTiles(OUT_RAW_TILES_DIR, mapCode)
+	const mapOrigin = MAP_ORIGINS[mapCode]
+
+	const { tiles, rect } = await getSavedRawTiles(OUT_RAW_TILES_DIR, mapCode)
 	// rect.bottom = rect.right = 0
 	const crop = CROP[mapCode]
 
@@ -48,18 +50,23 @@ const CROP = {
 	const mask = await prepareMask(OUT_MAP_MASK_CFG[mapCode], TILE_SIZE, fullWidth, fullHeight)
 
 	process.stdout.write('drawing')
-	for (let j = rect.top; j >= rect.bottom; j--) {
-		for (let i = rect.left; i >= rect.right; i--) {
-			const x = (rect.left - i) * TILE_SIZE - crop.left
-			const y = (rect.top - j) * TILE_SIZE - crop.top
-			try {
-				const img = await loadImage(makeSavedRawTileFPath(OUT_RAW_TILES_DIR, mapCode, i, j))
-				rc.drawImage(img, x, y, TILE_SIZE, TILE_SIZE)
-			} catch (err) {
-				if (err.code !== 'ENOENT') throw err
-			}
-			process.stdout.write('.')
+	for (const tile of tiles) {
+		let x = rect.left * TILE_SIZE - crop.left
+		let y = rect.top * TILE_SIZE - crop.top
+		if (tile.type === 'grid') {
+			x += -tile.i * TILE_SIZE
+			y += -tile.j * TILE_SIZE
+		} else {
+			x += -xOrigin2orig(tile.x, mapOrigin) * TILE_SIZE
+			y += -yOrigin2orig(tile.y, mapOrigin) * TILE_SIZE
 		}
+		try {
+			const img = await loadImage(tile.fpath)
+			rc.drawImage(img, Math.round(x), Math.round(y), TILE_SIZE, TILE_SIZE)
+		} catch (err) {
+			if (err.code !== 'ENOENT') throw err
+		}
+		process.stdout.write('.')
 	}
 	console.log()
 

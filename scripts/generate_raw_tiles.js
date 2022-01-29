@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { promises as fs } from 'fs'
 import { createReadStream, createWriteStream } from 'fs'
 import { PNG } from 'pngjs'
 import { getChosenMapCode, OUT_RAW_TILES_DIR } from './_common.js'
@@ -11,7 +12,6 @@ import {
 	getChosenTilesMap,
 	makeSavedRawTileFPath,
 	makeSavedRawTilesDirPath,
-	rawTileKey,
 } from '#lib/tiles/raw.js'
 
 /* === CONFIG === */
@@ -42,29 +42,29 @@ const OPTIMIZE = 3 //or false
 	const optimizationStats = { orig: 0, opt: 0 }
 
 	console.log('reading tiles list...')
-	await forEachTileGroup(tilesConfig, mapCode, async (i, j, isRowStart, srcFPaths, tilesRect) => {
-		const w = tilesRect.left - tilesRect.right + 1
-		const h = tilesRect.top - tilesRect.bottom + 1
-		const n = tilesRect.left - i + 1 + w * (tilesRect.top - j)
-		const total = w * h
-		process.stdout.write(`processing ${n}/${total}...\r`)
+	await forEachTileGroup(tilesConfig, mapCode, async (ref, srcFPaths, tilesRect, progress) => {
+		process.stdout.write(`processing ${(progress * 100).toFixed(0)}%...\r`)
 
 		if (srcFPaths.length > 0) {
-			const index = chosenTiles[rawTileKey(i, j)] ?? 0
+			const index = chosenTiles[ref.key] ?? 0
 			const srcFPath = srcFPaths[index]
-			const outFPath = makeSavedRawTileFPath(OUT_RAW_TILES_DIR, mapCode, i, j)
+			const outFPath = makeSavedRawTileFPath(OUT_RAW_TILES_DIR, mapCode, ref, tilesConfig)
 
-			const stripAplha = new Promise((res, rej) => {
-				const ws = createWriteStream(outFPath)
-				createReadStream(srcFPath)
-					.pipe(new PNG({ colorType: 2 }))
-					.on('parsed', function () {
-						const pix = this.data
-						for (let i = 3; i < pix.length; i += 4) pix[i] = 255
-						this.pack().pipe(ws)
-					})
-				ws.on('finish', res).on('error', rej)
-			})
+			// grid tiles should be opaque (have no alpha channel)
+			const stripAplha =
+				ref.type === 'grid'
+					? new Promise((res, rej) => {
+							const ws = createWriteStream(outFPath)
+							createReadStream(srcFPath)
+								.pipe(new PNG({ colorType: 2 }))
+								.on('parsed', function () {
+									const pix = this.data
+									for (let i = 3; i < pix.length; i += 4) pix[i] = 255
+									this.pack().pipe(ws)
+								})
+							ws.on('finish', res).on('error', rej)
+					  })
+					: fs.copyFile(srcFPath, outFPath)
 
 			await tasks.add(
 				stripAplha.then(() => OPTIMIZE && optimizeInPlace(outFPath, OPTIMIZE, optimizationStats)),
