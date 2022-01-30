@@ -1,11 +1,19 @@
 {
   "name": "teyvat-map",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "",
   "type": "module",
-  "main": "index.js",
+  "exports": {
+    "./tiles/summary": "./lib/tiles/summary.js"
+  },
+  "typesVersions": {
+    "*": {
+      "tiles/summary": ["types/tiles/summary.d.ts"]
+    }
+  },
   "scripts": {
-    "build-demo": "rollup --config demo/rollup.config.js"
+    "build-demo": "rollup --config demo/rollup.config.js",
+    "generate-types": "tsc --project tsconfig.typegen.json"
   },
   "author": "",
   "license": "ISC",
@@ -22,7 +30,8 @@
     "preact": "^10.6.4",
     "rollup": "^2.62.0",
     "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-terser": "^7.0.2"
+    "rollup-plugin-terser": "^7.0.2",
+    "typescript": "^4.5.5"
   },
   "imports": {
     "#lib/*": "./lib/*"

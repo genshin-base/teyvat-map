@@ -1,0 +1,10 @@
+{
+	"extends": "./tsconfig",
+	"include": ["lib/tiles/summary.js"],
+	"compilerOptions": {
+		"declaration": true,
+		"declarationDir": "./types/tiles",
+		"emitDeclarationOnly": true,
+		"noEmit": false
+	}
+}
