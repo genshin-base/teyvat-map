@@ -32,4 +32,4 @@ Set `OUT_MAP_MASK_CFG.teyvat.enable` to `true`.
 
 `./scripts/convert_png_tile_layers.js --map teyvat`
 
-`./scripts/generate_tile_layers_summary.js --map teyvat`
+`./scripts/generate_tile_layers_summary.js`
