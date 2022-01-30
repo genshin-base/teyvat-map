@@ -16,17 +16,14 @@ const mapConfig = /**@type {*} */ (window).mapConfig
 
 let tilesExt = 'jpg'
 let tilesGroup = 'teyvat'
-let tilesMask = {
-	teyvat: /**@type {ReturnType<typeof makeTileMaskChecker>|null}*/ (null),
-	enkanomiya: /**@type {ReturnType<typeof makeTileMaskChecker>|null}*/ (null),
-}
+/** @type {Record<string, ReturnType<typeof makeTileMaskChecker>>} */
+let tilesMask = {}
 
-for (const code in tilesMask)
-	fetch(`../tiles/${code}/summary.json`)
-		.then(r => r.json())
-		.then(info => {
-			tilesMask[code] = makeTileMaskChecker(info)
-		})
+fetch(`../tiles/summary.json`)
+	.then(r => r.json())
+	.then(info => {
+		for (const code in info) tilesMask[code] = makeTileMaskChecker(info[code])
+	})
 
 /** @type {import('locmap').TilePlaceholderDrawFunc} */
 function drawTilePlaceholder(map, x, y, z, drawX, drawY, tileW, scale) {
