@@ -26,6 +26,12 @@ const CROP = {
 		right: 0,
 		bottom: 0,
 	},
+	chasm: {
+		left: Math.round(TILE_SIZE * 0.41),
+		top: Math.round(TILE_SIZE * 0.71),
+		right: Math.round(TILE_SIZE * 0.8),
+		bottom: Math.round(TILE_SIZE * 0.88),
+	},
 }
 
 /* === /CONFIG === */
