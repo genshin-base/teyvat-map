@@ -35,12 +35,19 @@ const MAP_CROPS = {
 		right: 2,
 		bottom: 3,
 	},
+	chasm: {
+		left: 1,
+		top: 2,
+		right: 3,
+		bottom: 3,
+	},
 }
 
 // (optional) pre-scaled tiles for level 1 (if not set, tiles will be auto-upscaled from level 0 with bicibic)
 const SCALED_LEVEL_1_RAW_TILES_DIR = {
 	teyvat: null,
 	enkanomiya: OUT_RAW_TILES_DIR + '_x2',
+	chasm: OUT_RAW_TILES_DIR + '_x2',
 }
 
 /* === /CONFIG === */

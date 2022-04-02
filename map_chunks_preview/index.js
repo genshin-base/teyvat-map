@@ -13,10 +13,12 @@ const mapCode = tilesData.mapCode
 const tilesConfig = tilesData.tilesConfig
 
 // @ts-ignore
-const defaultChoices = Array(tilesConfig.rect.top - tilesConfig.rect.bottom).map((x, i) =>
-	// @ts-ignore
-	'.'.repeat(tilesConfig.rect.top - tilesConfig.rect.bottom),
-)
+const defaultChoices = Array(tilesConfig.rect.top - tilesConfig.rect.bottom)
+	.fill(0)
+	.map((x, i) =>
+		// @ts-ignore
+		'.'.repeat(tilesConfig.rect.top - tilesConfig.rect.bottom),
+	)
 
 /**
  * @param {{

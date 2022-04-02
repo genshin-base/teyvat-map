@@ -14,11 +14,15 @@ Modify `IN_TILES_CONFIG` in `global_config.js`
 
 Set `OUT_MAP_MASK_CFG.teyvat.enable` to `false` in `global_confg.js`.
 
+Set `CROP.teyvat` rect values to zero (disable crop) in `./scripts/concat_raw_tiles.js`.
+
 `./scripts/concat_raw_tiles.js --map teyvat`
 
 Use output map to update `mask_teyvat.svg` (it shoud include correct `stroke-with` and `stroke` color).
 
-Set `OUT_MAP_MASK_CFG.teyvat.enable` to `true`.
+Set `OUT_MAP_MASK_CFG.teyvat.enable` back to `true`.
+
+Restore `CROP.teyvat` values.
 
 ## Generate map
 

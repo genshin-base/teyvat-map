@@ -88,6 +88,19 @@ checkAvifSupport().then(avifIsSupported => {
 	map.register(new TileLayer(tileContainer))
 	map.register(new ControlLayer())
 	map.register(new URLLayer(0, 2))
+	map.register({
+		redraw(map) {
+			const rc = map.get2dContext()
+			if (!rc) return
+			const [w, h] = map.getViewBoxSize()
+			rc.fillStyle = 'white'
+			rc.fillRect(w / 2 - 1, h / 2 - 10.5, 2, 21)
+			rc.fillRect(w / 2 - 10.5, h / 2 - 1, 21, 2)
+			rc.fillStyle = 'black'
+			rc.fillRect(w / 2 - 0.5, h / 2 - 10, 1, 20)
+			rc.fillRect(w / 2 - 10, h / 2 - 0.5, 20, 1)
+		},
+	})
 	map.requestRedraw()
 	map.resize()
 	window.onresize = map.resize
