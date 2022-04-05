@@ -1,3 +1,17 @@
+## Branches
+
+### master
+
+Just scripts, no images.
+
+### images
+
+Scripts from `master` + images (tiles, sources).
+
+### gh-pages
+
+In separate version folders: images (only jpeg+avif tiles), demo pages.
+
 ## Prepare
 
 `rm -r ./tmp/preview_tiles`.
