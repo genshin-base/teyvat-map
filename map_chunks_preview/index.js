@@ -259,6 +259,9 @@ function Styles() {
 				outline: 2px solid white;
 				pointer-events: none;
 			}
+			.tile img {
+				display: block;
+			}
 			.tile.switchable img {
 				cursor: pointer;
 			}
@@ -382,6 +385,8 @@ function App() {
 			i = rect.left - i
 			j = rect.top - j
 			const nc = choices.slice()
+			for (let jj = 0; jj < rect.top - rect.bottom; jj++)
+				if (!nc[jj]) nc[jj] = '.'.repeat(rect.left - rect.right)
 			nc[j] = nc[j].slice(0, i) + index + nc[j].slice(i + 1)
 			setChoices(nc)
 		} else {

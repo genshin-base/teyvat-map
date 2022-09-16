@@ -10,23 +10,23 @@ export const IN_TILES_CONFIG = {
 		// (optional) useful for cutting off excess (blank and useless) source tiles.
 		// ascending from right to left, from bottom to top.
 		rect: {
-			left: 2,
+			left: 4,
 			right: -6,
 			top: 3,
 			bottom: -7,
 		},
 		// (optional) choosing correct image for tiles (if multiple images for same tile are available)
 		choices: [
-			'..1.01..1.',
-			'..0.01....',
-			'.10010..1.',
-			'1200000.1.',
-			'122000000.',
-			'231111111.',
-			'......1...',
-			'.00..1.10.',
-			'.00002000.',
-			'....110...',
+			'....0..00.',
+			'.......0..',
+			'..........',
+			'.11.......',
+			'.1111.....',
+			'.111......',
+			'.11.......',
+			'..........',
+			'..........',
+			'..........',
 		],
 	},
 	enkanomiya: {

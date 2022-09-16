@@ -89,6 +89,7 @@ const PAGE_DIR = TMP_TILE_DIR
 	await fs.writeFile(
 		`${PAGE_DIR}/index.html`,
 		`
+<!DOCTYPE html>
 <html>
 	<head>
 		<title>Map Chunks Preview</title>
