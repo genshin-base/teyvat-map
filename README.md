@@ -12,6 +12,7 @@ Scripts from `master` + images (tiles, sources).
 
 In separate version folders: images (only jpeg+avif tiles), demo pages.
 
+
 ## Prepare
 
 `rm -r ./tmp/preview_tiles`.
@@ -42,6 +43,7 @@ Restore `CROP.teyvat` values.
 
 Restore `TILE_SIZE` value.
 
+
 ## Generate map
 
 ### Single file
@@ -55,3 +57,20 @@ Restore `TILE_SIZE` value.
 `./scripts/convert_png_tile_layers.js --map teyvat`
 
 `./scripts/generate_tile_layers_summary.js`
+
+
+## Update gh-pages
+
+```bash
+version=v3.0
+git checkout images
+mkdir $version
+cp -r --reflink=auto tiles $version/tiles
+npm run build-demo
+mv demo $version/demo
+git checkout images
+git add $version
+git commit
+```
+
+Update URL on [map repo page](https://github.com/genshin-base/teyvat-map).
