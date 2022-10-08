@@ -24,7 +24,7 @@ const OPTIMIZE = 5 //0-7 or false
 /** Extra output map crop, in tiles (output-sized on level 0) */
 const MAP_CROPS = {
 	teyvat: {
-		left: 2,
+		left: 3,
 		top: 3,
 		right: 2,
 		bottom: 0,

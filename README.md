@@ -52,6 +52,8 @@ Restore `TILE_SIZE` value.
 
 ### Tiles
 
+Update `MAP_CROPS` in `generate_png_tile_layers.js`.
+
 `./scripts/generate_png_tile_layers.js --map teyvat`
 
 `./scripts/convert_png_tile_layers.js --map teyvat`
@@ -66,9 +68,11 @@ version=v3.0
 git checkout images
 mkdir $version
 cp -r --reflink=auto tiles $version/tiles
+rm -r $version/tiles/*/png
 npm run build-demo
-mv demo $version/demo
-git checkout images
+cp -r demo $version/demo
+rm $version/demo/{index.js,rollup.config.js}
+git checkout gh-pages
 git add $version
 git commit
 ```
