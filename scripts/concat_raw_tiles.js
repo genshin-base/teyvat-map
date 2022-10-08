@@ -15,7 +15,7 @@ const TILE_SIZE = 1024
 /** Extra output map crop, in pixels (may be negative) */
 const CROP = {
 	teyvat: {
-		left: Math.round(TILE_SIZE * 0.5),
+		left: Math.round(TILE_SIZE * 0.85),
 		top: Math.round(TILE_SIZE * 0.85),
 		right: Math.round(TILE_SIZE * 0.6),
 		bottom: 0,

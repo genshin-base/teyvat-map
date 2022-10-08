@@ -124,7 +124,7 @@ function Tile({ tile, chosenTiles, manualTiles, onChoose }) {
 	const [showDetails, setShowDetails] = useState(false)
 
 	const chosenIndex = chosenTiles[tile.key] ?? 0
-	const fpath = tile.fpaths[chosenIndex]
+	const fpath = tile.fpaths[chosenIndex] ?? tile.fpaths[0]
 
 	const onClick =
 		tile.fpaths.length <= 1
