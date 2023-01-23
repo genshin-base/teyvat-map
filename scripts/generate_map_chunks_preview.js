@@ -2,7 +2,7 @@
 import { promises as fs } from 'fs'
 import { relative } from 'path'
 import { rollup } from 'rollup'
-import { resize } from '#lib/media.js'
+import { getImgSize, resize } from '#lib/media.js'
 import { exists, parseArgs } from '#lib/os.js'
 import { BASE_DIR, getChosenMapCode } from './_common.js'
 import { IN_TILES_CONFIG, MAP_ORIGINS } from '../global_config.js'
@@ -50,7 +50,13 @@ const PAGE_DIR = TMP_TILE_DIR
 			const tmpFPath = `${TMP_TILE_DIR}/${ref.key}_${fpaths.length}.png`
 			if (!(await exists(tmpFPath))) {
 				console.log(`processing ${tmpFPath}`)
-				await resize(fpath, tmpFPath, TILE_PREVIEW_SIZE + '')
+				let size = TILE_PREVIEW_SIZE + ''
+				if (ref.type === 'manual') {
+					const { width, height } = await getImgSize(fpath)
+					const scale = TILE_PREVIEW_SIZE / 1024
+					size = `${Math.round(width * scale)}x${Math.round(height * scale)}!`
+				}
+				await resize(fpath, tmpFPath, size)
 			}
 			fpaths.push(relative(PAGE_DIR, tmpFPath))
 		}

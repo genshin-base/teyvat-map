@@ -4,7 +4,7 @@ import canvas from 'canvas'
 import { getChosenMapCode, OUT_RAW_TILES_DIR, OUT_TILES_DIR } from './_common.js'
 import { dirname } from 'path'
 import { MAP_ORIGINS, OUT_MAP_MASK_CFG } from '../global_config.js'
-import { PromisePool } from '#lib/utils.js'
+import { mustBeNotNull, PromisePool } from '#lib/utils.js'
 import { parseArgs, recreateDir } from '#lib/os.js'
 import { loadImageIfExists, optimizeInPlace, saveCanvas } from '#lib/media.js'
 import { prepareMask, applyMaskCrop, applyMaskShadow, applyMaskStroke } from '#lib/tiles/mask.js'
@@ -159,8 +159,16 @@ async function generateLayerFromInTiles(inRect, inTiles, level, outCanvas, outCa
 
 				const isVisible = x + inTileSize > 0 && y + inTileSize > 0 && x < inTileSize && y < inTileSize
 				if (isVisible) {
-					const img = await loadImageCached(inTile.fpath)
-					outRC.drawImage(img, x, y, inTileSize, inTileSize)
+					const img = mustBeNotNull(await loadImageCached(inTile.fpath))
+					let w, h
+					if (inTile.type === 'grid') {
+						w = h = inTileSize
+					} else {
+						const scale = inTileSize / 1024
+						w = img.naturalWidth * scale
+						h = img.naturalHeight * scale
+					}
+					outRC.drawImage(img, x, y, w, h)
 					drawnCount++
 				}
 			}

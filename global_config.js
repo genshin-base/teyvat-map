@@ -17,16 +17,25 @@ export const IN_TILES_CONFIG = {
 		},
 		// (optional) choosing correct image for tiles (if multiple images for same tile are available)
 		choices: [
-			'............',
+			'......0.....',
 			'............',
 			'............',
 			'...111......',
-			'..01121.....',
+			'.001121.....',
 			'..01111.....',
-			'...11.......',
-			'...0........',
+			'...3100.....',
+			'...0000.....',
 			'......1.....',
 			'............',
+		],
+		// manual tile positions, overlay to grid tiles (coord are relative to MAP_ORIGINS)
+		manual: [
+			{ name: /^UI_Map_Deshret_27[^_]/, x: -6462 / 1024, y: 4476 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_27_02/, x: -6647 / 1024, y: 4643 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_32_04/, x: -6704 / 1024, y: 2846 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_32_05/, x: -6506 / 1024, y: 3671 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_26_01/, x: -5296 / 1024, y: 3690 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_26_02/, x: -5360 / 1024, y: 4279 / 1024, choice: 0 },
 		],
 	},
 	enkanomiya: {
