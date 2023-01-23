@@ -57,21 +57,30 @@ const CROP = {
 
 	process.stdout.write('drawing')
 	for (const tile of tiles) {
+		let img
+		try {
+			img = await loadImage(tile.fpath)
+		} catch (err) {
+			if (err.code === 'ENOENT') continue
+			throw err
+		}
+
 		let x = rect.left * TILE_SIZE - crop.left
 		let y = rect.top * TILE_SIZE - crop.top
+		let w, h
 		if (tile.type === 'grid') {
 			x += -tile.i * TILE_SIZE
 			y += -tile.j * TILE_SIZE
+			w = h = TILE_SIZE
 		} else {
 			x += -xOrigin2orig(tile.x, mapOrigin) * TILE_SIZE
 			y += -yOrigin2orig(tile.y, mapOrigin) * TILE_SIZE
+			const scale = TILE_SIZE / 1024
+			w = img.naturalWidth * scale
+			h = img.naturalHeight * scale
 		}
-		try {
-			const img = await loadImage(tile.fpath)
-			rc.drawImage(img, Math.round(x), Math.round(y), TILE_SIZE, TILE_SIZE)
-		} catch (err) {
-			if (err.code !== 'ENOENT') throw err
-		}
+
+		rc.drawImage(img, Math.round(x), Math.round(y), w, h)
 		process.stdout.write('.')
 	}
 	console.log()

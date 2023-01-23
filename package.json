@@ -20,20 +20,19 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@rollup/plugin-alias": "^3.1.9",
-    "@rollup/plugin-node-resolve": "^14.1.0",
-    "@types/node": "^18.7.18",
-    "canvas": "^2.8.0",
-    "eslint": "^8.5.0",
-    "eslint-config-prettier": "^8.3.0",
+    "@rollup/plugin-alias": "^4.0.3",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@types/node": "^18.11.18",
+    "canvas": "^2.11.0",
+    "eslint": "^8.32.0",
+    "eslint-config-prettier": "^8.6.0",
     "htm": "^3.1.0",
     "locmap": "github:3bl3gamer/locmap#v1.7.0",
     "pngjs": "^6.0.0",
-    "preact": "^10.6.4",
-    "rollup": "^2.62.0",
-    "rollup-plugin-node-resolve": "^5.2.0",
+    "preact": "^10.11.3",
+    "rollup": "^2.79.1",
     "rollup-plugin-terser": "^7.0.2",
-    "typescript": "^4.5.5"
+    "typescript": "^4.9.4"
   },
   "imports": {
     "#lib/*": "./lib/*"

@@ -1,5 +1,5 @@
 import { render } from 'preact'
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { html } from 'htm/preact'
 import { createPortal as createPortal_ } from '../node_modules/preact/compat/src/portals'
 import { getChosenTilesMap, rawManualTileKey, rawGridTileKey } from '#lib/tiles/raw.js'
@@ -118,13 +118,50 @@ function TileDetails({ tile, onClose }) {
  *   chosenTiles: Record<string, number>,
  *   manualTiles: import('#lib/tiles/raw').ManualTileConfig[],
  *   onChoose: (index:number) => number,
+ *   onManualMoveRelative?: (dx:number, dy:number) => number,
  * }} params
  */
-function Tile({ tile, chosenTiles, manualTiles, onChoose }) {
+function Tile({ tile, chosenTiles, manualTiles, onChoose, onManualMoveRelative }) {
 	const [showDetails, setShowDetails] = useState(false)
+	const [isHovered, setIsHovered] = useState(false)
+	const elemRef = useRef(/**@type {HTMLElement|null}*/ (null))
 
 	const chosenIndex = chosenTiles[tile.key] ?? 0
 	const fpath = tile.fpaths[chosenIndex] ?? tile.fpaths[0]
+
+	const onMoveRef = useRef(onManualMoveRelative)
+	onMoveRef.current = onManualMoveRelative
+	useEffect(() => {
+		if (tile.ref.type !== 'manual' || !onMoveRef.current) return
+		if (!elemRef.current) return
+		const elem = elemRef.current
+
+		function onKeyDown(/**@type {KeyboardEvent}*/ e) {
+			if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
+
+			const d = (1 / 1024) * (e.shiftKey ? 20 : 1)
+			if (e.key === 'ArrowUp') onMoveRef.current?.(0, -d)
+			else if (e.key === 'ArrowDown') onMoveRef.current?.(0, d)
+			else if (e.key === 'ArrowLeft') onMoveRef.current?.(-d, 0)
+			else if (e.key === 'ArrowRight') onMoveRef.current?.(d, 0)
+		}
+		function onMouseEnter() {
+			setIsHovered(true)
+			addEventListener('keydown', onKeyDown)
+		}
+		function onMouseLeave() {
+			setIsHovered(false)
+			removeEventListener('keydown', onKeyDown)
+		}
+
+		elem.addEventListener('mouseenter', onMouseEnter)
+		elem.addEventListener('mouseleave', onMouseLeave)
+		return () => {
+			elem.removeEventListener('mouseenter', onMouseEnter)
+			elem.removeEventListener('mouseleave', onMouseLeave)
+			removeEventListener('keydown', onKeyDown)
+		}
+	}, [tile.ref])
 
 	const onClick =
 		tile.fpaths.length <= 1
@@ -140,6 +177,7 @@ function Tile({ tile, chosenTiles, manualTiles, onChoose }) {
 			: {}
 
 	return html`<div
+		ref=${elemRef}
 		class=${'tile' +
 		(tile.ref.type === 'manual' ? ' absolute' : '') +
 		(tile.fpaths.length > 1 ? ' switchable' : '')}
@@ -150,6 +188,7 @@ function Tile({ tile, chosenTiles, manualTiles, onChoose }) {
 		<div class="menu">
 			<div class="index">
 				${tile.fpaths.length <= 1 ? '.' : `${chosenIndex + 1}/${tile.fpaths.length}`}
+				${isHovered ? 'use arrow keys' : ''}
 			</div>
 			<div class="coords">${tile.ref.type === 'grid' ? tile.key : ''}</div>
 			<button class="diff-btn" onclick=${() => setShowDetails(x => !x)}>diff</button>
@@ -165,9 +204,10 @@ function Tile({ tile, chosenTiles, manualTiles, onChoose }) {
  *   chosenTiles: Record<string, number>,
  *   manualTiles: import('#lib/tiles/raw').ManualTileConfig[],
  *   onChoose: (tile:import('../scripts/generate_map_chunks_preview').PreviewPageTile, index:number) => unknown,
+ *   onManualMove: (tile:import('../scripts/generate_map_chunks_preview').PreviewPageTile, x:number, y:number) => unknown,
  * }} params
  */
-function TilesWrap({ tiles, rect, chosenTiles, manualTiles, onChoose }) {
+function TilesWrap({ tiles, rect, chosenTiles, manualTiles, onChoose, onManualMove }) {
 	const [showInfo, setShowInfo] = useState(false)
 
 	const rows = []
@@ -203,6 +243,7 @@ function TilesWrap({ tiles, rect, chosenTiles, manualTiles, onChoose }) {
 				chosenTiles=${chosenTiles}
 				manualTiles=${manualTiles}
 				onChoose=${i => onChoose(tile, i)}
+				onManualMoveRelative=${(dx, dy) => onManualMove(tile, x.x + dx, x.y + dy)}
 			/>`
 		)
 	})
@@ -217,7 +258,7 @@ function TilesWrap({ tiles, rect, chosenTiles, manualTiles, onChoose }) {
 
 	return html`
 		<div class=${'tiles-wrap' + (showInfo ? ' extra-info' : '')}>
-			<code>I</code> — toggle extra info
+			<div style="position:absolute; top:0; left:0"><code>I</code> — toggle extra info</div>
 			<table id="tilesTable">
 				${rows}
 			</table>
@@ -390,10 +431,22 @@ function App() {
 			nc[j] = nc[j].slice(0, i) + index + nc[j].slice(i + 1)
 			setChoices(nc)
 		} else {
-			const nt = manualTiles.slice()
-			nt[tile.ref.index] = { ...nt[tile.ref.index], choice: index }
-			setManualTiles(nt)
+			const mt = manualTiles.slice()
+			mt[tile.ref.index] = { ...mt[tile.ref.index], choice: index }
+			setManualTiles(mt)
 		}
+	}
+
+	/**
+	 * @param {import('../scripts/generate_map_chunks_preview').PreviewPageTile} tile
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	function moveManualTile(tile, x, y) {
+		if (tile.ref.type !== 'manual') throw new Error(`${tile.ref.type} tile can not be moved`)
+		const mt = manualTiles.slice()
+		mt[tile.ref.index] = { ...mt[tile.ref.index], x, y }
+		setManualTiles(mt)
 	}
 
 	return html`
@@ -411,6 +464,7 @@ function App() {
 			chosenTiles=${chosenTiles}
 			manualTiles=${manualTiles}
 			onChoose=${chooseImg}
+			onManualMove=${moveManualTile}
 		/>
 	`
 }
