@@ -78,7 +78,7 @@ cp -r demo $version/demo
 rm $version/demo/{index.js,rollup.config.js}
 git checkout gh-pages
 git add $version
-git commit
+git commit -m "$version images"git
 ```
 
 Update URL on [map repo page](https://github.com/genshin-base/teyvat-map).
