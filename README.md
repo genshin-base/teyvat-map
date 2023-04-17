@@ -15,6 +15,10 @@ In separate version folders: images (only jpeg+avif tiles), demo pages.
 
 ## Prepare
 
+`git checkout images`
+
+Configure `IN_TILES_CONFIG.dirs` in `global_config.js`.
+
 `rm -r ./tmp/preview_tiles`.
 
 `./scripts/generate_map_chunks_preview.js --map teyvat`
@@ -39,7 +43,7 @@ Use output map to update `mask_teyvat.svg` (it should include correct `stroke-wi
 
 Set `OUT_MAP_MASK_CFG.teyvat.enable` back to `true`.
 
-Restore `CROP.teyvat` values.
+Restore and update `CROP.teyvat` values.
 
 Restore `TILE_SIZE` value.
 

@@ -6,27 +6,29 @@ import { BASE_DIR } from './scripts/_common.js'
 export const IN_TILES_CONFIG = {
 	teyvat: {
 		// source game tile dirs (with files named like "UI_MapBack_1_2.png")
-		dirs: [],
+		dirs: [
+			`${BASE_DIR}/raw_tiles_extra/teyvat`, //
+		],
 		// (optional) useful for cutting off excess (blank and useless) source tiles.
 		// ascending from right to left, from bottom to top.
 		rect: {
-			left: 6,
+			left: 7,
 			right: -6,
 			top: 3,
 			bottom: -7,
 		},
 		// (optional) choosing correct image for tiles (if multiple images for same tile are available)
 		choices: [
-			'......0.....',
-			'............',
-			'............',
-			'...111......',
-			'.001121.....',
-			'..01111.....',
-			'...3100.....',
-			'...0000.....',
-			'......1.....',
-			'............',
+			'.......1..11.',
+			'..........0..',
+			'....0..1.....',
+			'..00112......',
+			'.0002121.....',
+			'...01111.....',
+			'....3100.....',
+			'....0000.....',
+			'.......1.....',
+			'.............',
 		],
 		// manual tile positions, overlay to grid tiles (coord are relative to MAP_ORIGINS)
 		manual: [
@@ -36,6 +38,7 @@ export const IN_TILES_CONFIG = {
 			{ name: /^UI_Map_Deshret_32_05/, x: -6506 / 1024, y: 3671 / 1024, choice: 0 },
 			{ name: /^UI_Map_Deshret_26_01/, x: -5296 / 1024, y: 3690 / 1024, choice: 0 },
 			{ name: /^UI_Map_Deshret_26_02/, x: -5360 / 1024, y: 4279 / 1024, choice: 0 },
+			{ name: /^UI_Map_Deshret_30_06/, x: -7405 / 1024, y: 1634 / 1024, choice: 1 },
 		],
 	},
 	enkanomiya: {
