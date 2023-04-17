@@ -72,6 +72,8 @@ export const IN_TILES_CONFIG = {
  * }} params
  */
 function TileDetails({ tile, onClose }) {
+	const [diffFPaths, setDiffFPaths] = useState(() => tile.fpaths.slice())
+
 	useEffect(() => {
 		function onKey(/**@type {KeyboardEvent}*/ e) {
 			if (e.key === 'Escape') onClose()
@@ -93,15 +95,28 @@ function TileDetails({ tile, onClose }) {
 							<th>#</th>
 							<th>Tile</th>
 							<th>Diff</th>
+							<th></th>
 						</tr>
 					</thead>
-					${tile.fpaths.map(
+					${diffFPaths.map(
 						(x, i) =>
 							html`<tr>
 								<td>${i + 1}</td>
 								<td><img src=${x} /></td>
 								<td class="diff">
-									${i > 0 && html`<img src=${x} /><img src=${tile.fpaths[i - 1]} />`}
+									${i > 0 && html`<img src=${x} /><img src=${diffFPaths[i - 1]} />`}
+								</td>
+								<td>
+									<button
+										style="color:red"
+										onclick=${() => {
+											const newFPaths = diffFPaths.slice()
+											newFPaths.splice(i, 1)
+											setDiffFPaths(newFPaths)
+										}}
+									>
+										X
+									</button>
 								</td>
 							</tr>`,
 					)}
