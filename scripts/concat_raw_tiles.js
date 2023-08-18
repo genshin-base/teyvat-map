@@ -16,7 +16,7 @@ const TILE_SIZE = 1024
 const CROP = {
 	teyvat: {
 		left: Math.round(TILE_SIZE * 0.85),
-		top: Math.round(TILE_SIZE * 0.85),
+		top: Math.round(TILE_SIZE * 0.5),
 		right: Math.round(TILE_SIZE * 0.6),
 		bottom: 0,
 	},

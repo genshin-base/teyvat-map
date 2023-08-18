@@ -25,7 +25,7 @@ const OPTIMIZE = 5 //0-7 or false
 const MAP_CROPS = {
 	teyvat: {
 		left: 3,
-		top: 3,
+		top: 2,
 		right: 2,
 		bottom: 0,
 	},
